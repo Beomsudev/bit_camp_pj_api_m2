@@ -1,8 +1,7 @@
-# in 1
+
 import os
 import pandas as pd
 import numpy as np
-from scipy import stats
 from ast import literal_eval
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics.pairwise import linear_kernel, cosine_similarity
@@ -11,539 +10,475 @@ from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.corpus import wordnet
 from surprise import Reader, Dataset, SVD, accuracy
 
-import warnings; warnings.simplefilter('ignore')
+from com_dayoung_api.cmm.util.file_helper import FileReader, FileChecker
 
-class MovieAi(object):
+class MovieAi:
     def __init__(self):
-        ...
-
-# path = os.path.abspath("")
-# fname = '\data\movie_lens\movies_metadata.csv'
-# in 2
-path = os.path.abspath('')
-fname = '\data\movies_metadata.csv'
-md = pd.read_csv(path + fname, encoding='utf-8')
-# print(md.head())
-
-# in 3
-print('////////////////////// Before ////////////////////// \n', md['genres'].head(), '\n////////////////////// Before //////////////////////')
-
-# dictionary안에 담겨있는 Genre 정보를 List 형태로 세팅
-# 1. md['genres'].fillna('[]') : genres 컬럼에 null 값을 '[](빈 리스트 값)'으로 채워넣음
-# 2. apply(literal_eval) : literal_eval를 사용하여 String으로 되어있는 값을 List & Dictionary로 사용할 수 있게 변환
-# 3. apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else []) : x가 list인 경우 안에 들어있는 dictionary 중 name에 해당하는 값을 list에 담음
-md['genres'] = md['genres'].fillna('[]').apply(literal_eval).apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else [])
-
-print('////////////////////// After ////////////////////// \n', md['genres'].head(), '\n////////////////////// After //////////////////////')
-
-# in4
-# print('vote ::: \n', md[['vote_count', 'vote_average']].head())
-vote_counts = md[md['vote_count'].notnull()]['vote_count'].astype('int')
-vote_averages = md[md['vote_average'].notnull()]['vote_average'].astype('int')
-C = vote_averages.mean()
-# print(C)
-
-# in5
-# 총 45460개의 영화 중 상위 5%는 2273번째
-# print(vote_counts.sort_values(ascending=False)[2273:2274])
-
-# quantile는 데이터를 크기대로 정렬하였을 때 분위수를 구하는 함수. quantile(0.95)는 상위 5%에 해당하는 값을 찾는 것
-m = vote_counts.quantile(0.95)
-# print(m)
-
-# in 6
-# print('release_date ::: \n', md['release_date'].head())
-
-# pd.to_datetime
-# errors : {‘ignore’, ‘raise’, ‘coerce’}, default ‘raise’
-# If ‘raise’, then invalid parsing will raise an exception
-# If ‘coerce’, then invalid parsing will be set as NaT
-# If ‘ignore’, then invalid parsing will return the input
-
-# 'release_date'를 split해서 year만 추출
-md['year'] = pd.to_datetime(md['release_date'], errors='coerce').apply(lambda x: str(x).split('-')[0] if x != np.nan else np.nan)
-
-# print('year ::: \n', md['year'].head())
-
-# in 7
-# 평가 수가 상위 5%인(434보다 큰) 데이터 추출
-qualified = md[(md['vote_count'] >= m) & (md['vote_count'].notnull()) & (md['vote_average'].notnull())][['title', 'year', 'vote_count', 'vote_average', 'popularity', 'genres']]
-qualified['vote_count'] = qualified['vote_count'].astype('int')
-qualified['vote_average'] = qualified['vote_average'].astype('int')
-# print(qualified.shape)
-
-# in 8
-def weighted_rating(x):
-    # print(x)
-    # print(m)
-    # print(C)
-    v = x['vote_count']
-    R = x['vote_average']
-    # print(v)
-    # print(R)
-    return (v/(v+m) * R) + (m/(m+v) * C)
-
-# in 9
-x = qualified
-qualified['wr'] = qualified.apply(weighted_rating, axis=1)
-print(qualified['wr'])
-# in 10
-# Weighted Rating 상위 250개의 영화 
-qualified = qualified.sort_values('wr', ascending=False).head(250)
-
-# # in 11
-print(qualified.head(15))
-
-# in 12
-# stack() : stack이 (위에서 아래로 길게, 높게) 쌓는 것이면, unstack은 쌓은 것을 옆으로 늘어놓는것(왼쪽에서 오른쪽으로 넓게) 라고 연상이 될 것
-# reset_index() : 기존의 행 인덱스를 제거하고 인덱스를 데이터 열로 추가
-s = md.apply(lambda x: pd.Series(x['genres']), axis=1).stack().reset_index(level=1, drop=True)
-s.name = 'genre'
-print(s.head(10))
-
-gen_md = md.drop('genres', axis=1).join(s)
-print(gen_md.head(10))
-
-# in 13
-
-def build_chart(genre, percentile=0.85):
-    df = gen_md[gen_md['genre'] == genre]
-    vote_counts = df[df['vote_count'].notnull()]['vote_count'].astype('int')
-    vote_averages = df[df['vote_average'].notnull()]['vote_average'].astype('int')
-    C = vote_averages.mean()
-    m = vote_counts.quantile(percentile)
-    
-    qualified = df[(df['vote_count'] >= m) & (df['vote_count'].notnull()) & (df['vote_average'].notnull())][['title','year','vote_count','vote_average','popularity']]
-    qualified['vote_count'] = qualified['vote_count'].astype('int')
-    qualified['vote_average'] = qualified['vote_average'].astype('int')
-    
-    qualified['wr'] = qualified.apply(lambda x: (x['vote_count']/(x['vote_count']+m) * x['vote_average']) + (m/(m+x['vote_count']) * C), axis=1)
-    qualified = qualified.sort_values('wr', ascending=False).head(250)
-    
-    return qualified
-
-# print(qualified.head(15))
-
-# in 14
-build_chart('Romance').head(15)
-# print(build_chart('Romance').head(15))
-
-# in 15
-path = os.path.abspath('')
-fname = '\data\links_small.csv'
-links_small = pd.read_csv(path + fname, encoding='utf-8')
-links_small = links_small[links_small['tmdbId'].notnull()]['tmdbId'].astype('int')
-links_small.head()
-# print(links_small.head())
-
-# in 16
-# Drop a row by index : 19730, 29503, 33587 행은 이상한 데이터들(md.iloc[19730], md.iloc[29503], md.iloc[33587])
-md = md.drop([19730, 29503, 35587])
-
-# in 17
-#Check EDA Notebook for how and why I got these indices.
-md['id'] = md['id'].astype('int')
-
-# in 18
-smd = md[md['id'].isin(links_small)]
-smd.shape
-# print(smd.shape)
-
-# in 19
-smd = md[md['id'].isin(links_small)]
-# print(smd.shape)
-
-# in 20
-smd['tagline'] = smd['tagline'].fillna('')
-smd['description'] = smd['overview'] + smd['tagline']
-smd['description'] = smd['description'].fillna('')
-
-smd['description'].head()
-print(smd['description'].head())
-
-# in 21
-# n-그램:단어장 생성에 사용할 토큰의 크기를 결정한다. 모노그램(1-그램)은 토큰 하나만 단어로 사용하며 바이그램(2-그램)은 두 개의 연결된 토큰을 하나의 단어로 사용한다.
-# Stop Words:문서에서 단어장을 생성할 때 무시할 수 있는 단어를 말한다. 보통 영어의 관사나 접속사, 한국어의 조사 등이 여기에 해당한다. stop_words 인수로 조절할 수 있다.
-tf = TfidfVectorizer(analyzer='word', ngram_range=(1, 2), min_df=0, stop_words='english')
-tfidf_matrix = tf.fit_transform(smd['description'])
-
-# in 22
-# print(tfidf_matrix[10])
-
-# in 23
-tfidf_matrix.shape
-# print(tfidf_matrix.shape)
-
-# in 24
-# linear_kernel는 두 벡터의 dot product 이다.
-cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
-
-# in 25
-cosine_sim[0]
-print(cosine_sim[0])
-
-# in 26
-smd = smd.reset_index()
-titles = smd['title']
-indices = pd.Series(smd.index, index=smd['title'])
-
-print(titles.head(), indices.head())
-
-# # in 27
-
-def get_recommendations(title):
-    idx = indices[title]
-    sim_scores = list(enumerate(cosine_sim[idx]))
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = sim_scores[1:31]
-    movie_indices = [i[0] for i in sim_scores]
-    return titles.iloc[movie_indices]
-
-# in 28
-get_recommendations('The Godfather').head(10)
-print(get_recommendations('The Godfather').head(10))
-
-# # in 29
-get_recommendations('Inception').head(10)
-print(get_recommendations('Inception').head(10))
-
-# in 30
-path = os.path.abspath('')
-fname = '\data\credits.csv'
-credits = pd.read_csv(path + fname, encoding='utf-8')
-fname = '\data\keywords.csv'
-keywords = pd.read_csv(path + fname, encoding='utf-8')
-
-# in 31
-credits['crew'][0]
-# print(credits['crew'][0])
-
-print(md)
-# in 32
-keywords['id'] = keywords['id'].astype('int')
-credits['id'] = credits['id'].astype('int')
-md['id'] = md['id'].astype('int')
-
-# in 33
-md.shape
-# print(md.shape)
-
-# in 34
-md = md.merge(credits, on='id')
-md = md.merge(keywords, on='id')
-
-# in 35
-smd = md[md['id'].isin(links_small)]
-smd.shape
-print(smd.shape)
-
-# # in 36
-smd['cast'] = smd['cast'].apply(literal_eval)
-smd['crew'] = smd['crew'].apply(literal_eval)
-smd['keywords'] = smd['keywords'].apply(literal_eval)
-smd['cast_size'] = smd['cast'].apply(lambda x: len(x))
-smd['crew_size'] = smd['crew'].apply(lambda x: len(x))
-
-# # in 37
-
-def get_director(x):
-    for i in x:
-        if i['job'] == 'Director':
-            return i['name']
-    return np.nan
-
-# in 38
-smd['director'] = smd['crew'].apply(get_director)
-
-# in 39
-# 출연진 중 상위에 노출되는 3명만 추출
-smd['cast'] = smd['cast'].apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else [])
-smd['cast'] = smd['cast'].apply(lambda x: x[:3] if len(x) >= 3 else x)
-
-# in 40
-smd['keywords'] = smd['keywords'].apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else [])
-
-# in 41
-# 출연진의 이름에서 공백 삭제
-smd['cast'] = smd['cast'].apply(lambda x: [str.lower(i.replace(" ", "")) for i in x])
-
-# in 42
-# 감독의 이름에서 공백 삭제 및 3번 언급?
-smd['director'] = smd['director'].astype('str').apply(lambda x: str.lower(x.replace(" ", "")))
-smd['director'] = smd['director'].apply(lambda x: [x, x, x])
-
-# in 43
-s = smd.apply(lambda x: pd.Series(x['keywords']), axis=1).stack().reset_index(level=1, drop=True)
-s.name = 'keyword'
-
-# # in 44
-s = s.value_counts()
-s[:5]
-print(s[:5])
-
-# in 45
-# 2번 이상 등장한 키워드만 추출
-s = s[s > 1]
-
-# in 46
-# 어근 추출을 통해 동일 의미&다른 형태의 단어(dogs&dog, imaging&image 등)를 동일한 단어로 인식
-stemmer = SnowballStemmer('english')
-# print("dogs의 어근 : ", stemmer.stem('dogs'))
-# print("dog의 어근 : ", stemmer.stem('dog'))
-
-# in 47
-
-def filter_keywords(x):
-    words = []
-    for i in x:
-        if i in s:
-            words.append(i)
-    return words
-
-# in 48
-# 키워드의 어근을 찾아서 공백 제거 후 세팅
-smd['keywords'] = smd['keywords'].apply(filter_keywords)
-smd['keywords'] = smd['keywords'].apply(lambda x: [stemmer.stem(i) for i in x])
-smd['keywords'] = smd['keywords'].apply(lambda x: [str.lower(i.replace(" ", "")) for i in x])
-
-# # in 49
-smd['soup'] = smd['keywords'] + smd['cast'] + smd['director'] + smd['genres']
-smd['soup'] = smd['soup'].apply(lambda x: ' '.join(x))
-
-# # in 50
-count = CountVectorizer(analyzer='word', ngram_range=(1,2), min_df=0, stop_words='english')
-count_matrix = count.fit_transform(smd['soup'])
-
-# # in 51
-cosine_sim = cosine_similarity(count_matrix, count_matrix)
-
-# # in 52
-smd = smd.reset_index()
-titles = smd['title']
-indices = pd.Series(smd.index, index=smd['title'])
-
-# in 53
-get_recommendations('The Dark Knight').head(10)
-print(get_recommendations('The Godfather').head(10))
-
-# in 54
-get_recommendations('Mean Girls').head(10)
-print(get_recommendations('Inception').head(10))
-
-# # in 55
-
-def improved_recommendations(title):
-    print('**********')
-    print(indices)
-    print(cosine_sim)
-    print(title)
-    idx = indices[title]
-    print(idx)
-    sim_scores = list(enumerate(cosine_sim[idx]))
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = sim_scores[1:26]
-    movie_indices = [i[0] for i in sim_scores]
-    print(movie_indices)
-
-    movies = smd.iloc[movie_indices][['title','vote_count','vote_average','year']]
-#     print(movies)
-    
-    vote_counts = movies[movies['vote_count'].notnull()]['vote_count'].astype('int')
-    vote_averages = movies[movies['vote_average'].notnull()]['vote_average'].astype('int')
-    C = vote_averages.mean()
-    m = vote_counts.quantile(0.60)
-    qualified = movies[(movies['vote_count'] >= m) & (movies['vote_count'].notnull())]
-#     print(qualified)
-    qualified['vote_count'] = qualified['vote_count'].astype('int')
-    qualified['wr'] = qualified.apply(weighted_rating, axis=1)
-    qualified = qualified.sort_values('wr', ascending=False).head(10)
-    print('##########')
-    print(qualified)
-    return qualified
-
-print('구분구분구분')
-# in 56
-# improved_recommendations('The Dark Knight')
-print(improved_recommendations('The Godfather'))
-
-# in 57
-# improved_recommendations('Mean Girls')
-print(improved_recommendations('Inception'))
-
-# in 58
-# surprise 라이브러리의 Reader
-reader = Reader()
-
-# in 59
-path = os.path.abspath('')
-fname = '\data\\ratings_small.csv'
-ratings = pd.read_csv(path + fname, encoding='utf-8')
-
-# in 60
-data = Dataset.load_from_df(ratings[['userId', 'movieId','rating']], reader)
-# data.split(n_folds=5)
-
-trainset = data.build_full_trainset()
-testset = trainset.build_testset()
-
-# in 61
-svd = SVD()
-# evaluate(svd, data, measures=['RMSE', 'MAE'])
-
-####### 기존 커널대로 진행하면 오류나서 수정 #######
-svd.fit(trainset)
-predictions = svd.test(testset)
-accuracy.rmse(predictions)
-# print(accuracy.rmse(predictions))
-
-# in 62
-ratings[ratings['userId'] == 1]
-
-# in 63
-svd.predict(1, 302, 3)
-# print(svd.predict(1, 302, 3))
-
-# in 64
-
-def convert_int(x):
-    try:
-        return int(x)
-    except:
+        self.fileReader = FileReader()
+        self.filechecker = FileChecker()
+        self.path = os.path.abspath("")
+
+        self.md = object
+        self.qualified = object
+        self.min_vote = int
+        self.movie_ave = int
+        self.smd = object
+        self.indices = object
+        self.cosine_sim = object
+        self.titles = object
+        self.links_small = object
+        self.keyword_frequency = object
+
+    # def hook(self):
+
+        # x = qualified
+        # qualified['wr'] = qualified.apply(self.weighted_rating, axis=1)
+        # qualified = qualified.sort_values('wr', ascending=False).head(250)
+
+
+    def preprocess(self):
+        '''
+        adult                     : null count =      0
+        belongs_to_collection     : null count =  40972
+        budget                    : null count =      0
+        genres                    : null count =      0 -> id제거 & 장르만 list화 / 
+        homepage                  : null count =  37684
+        id                        : null count =      0
+        imdb_id                   : null count =     17
+        original_language         : null count =     11
+        original_title            : null count =      0
+        overview                  : null count =    954
+        popularity                : null count =      5
+        poster_path               : null count =    386
+        production_companies      : null count =      3
+        production_countries      : null count =      3
+        release_date              : null count =     87
+        revenue                   : null count =      6
+        runtime                   : null count =    263
+        spoken_languages          : null count =      6
+        status                    : null count =     87
+        tagline                   : null count =  25054
+        title                     : null count =      6
+        video                     : null count =      6
+        vote_average              : null count =      6 -> string > ing
+        vote_count                : null count =      6 -> string > ing
+        year                      : null count =      0 -> 년도만 표기
+        '''
+        
+        
+        fchecker = self.filechecker
+
+        path = os.path.abspath('')
+        fname = '\data\movies_metadata.csv'
+        md = pd.read_csv(path + fname, encoding='utf-8')
+        
+        md['genres'] = md['genres'].fillna('[]').apply(literal_eval).apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else [])
+        md['year'] = pd.to_datetime(md['release_date'], errors='coerce').apply(lambda x: str(x).split('-')[0] if x != np.nan else np.nan)
+        md = md.drop([19730, 29503, 35587])
+
+        vote_counts = md[md['vote_count'].notnull()]['vote_count'].astype('int')
+        vote_averages = md[md['vote_average'].notnull()]['vote_average'].astype('int')
+        movie_ave = vote_averages.mean()
+        
+        min_vote = vote_counts.quantile(0.95)
+
+        self.md = md
+        self.movie_ave = movie_ave
+        self.min_vote = min_vote
+
+        return md
+
+    def create_qualified(self):
+        '''
+        adult                     : null count =      0 -> drop
+        belongs_to_collection     : null count =  40972 -> drop
+        budget                    : null count =      0 -> drop
+        genres                    : null count =      0
+        homepage                  : null count =  37684 -> drop
+        id                        : null count =      0 -> drop
+        imdb_id                   : null count =     17 -> drop
+        original_language         : null count =     11 -> drop
+        original_title            : null count =      0 -> drop
+        overview                  : null count =    954 -> drop
+        popularity                : null count =      5
+        poster_path               : null count =    386 -> drop
+        production_companies      : null count =      3 -> drop
+        production_countries      : null count =      3 -> drop
+        release_date              : null count =     87 -> drop
+        revenue                   : null count =      6 -> drop
+        runtime                   : null count =    263 -> drop
+        spoken_languages          : null count =      6 -> drop
+        status                    : null count =     87 -> drop
+        tagline                   : null count =  25054 -> drop
+        title                     : null count =      6
+        video                     : null count =      6 -> drop
+        vote_average              : null count =      6
+        vote_count                : null count =      6
+        year                      : null count =      0
+        '''
+        fchecker = self.filechecker
+        md = self.md
+        min_vote = self.min_vote
+
+        qualified = md[(md['vote_count'] >= min_vote) & (md['vote_count'].notnull()) & (md['vote_average'].notnull())][['title', 'year', 'vote_count', 'vote_average', 'popularity', 'genres']]
+        qualified['vote_count'] = qualified['vote_count'].astype('int')
+        qualified['vote_average'] = qualified['vote_average'].astype('int')
+        self.qualified = qualified
+
+
+        print(qualified)
+        fchecker.df_null_check(qualified)
+
+        '''
+        ['title', 'year', 'vote_count', 'vote_average', 'popularity', 'genres']
+        title                     : null count =      0
+        year                      : null count =      0
+        vote_count                : null count =      0
+        vote_average              : null count =      0
+        popularity                : null count =      0
+        genres                    : null count =      0
+        '''
+
+        return qualified
+
+    def weighted_rating(self, x):
+        min_vote = self.min_vote
+        movie_ave = self.movie_ave
+
+        v = x['vote_count']
+        R = x['vote_average']
+        return (v/(v+min_vote) * R) + (min_vote/(min_vote+v) * movie_ave)
+
+    def emb_proc(self):
+        md = self.md
+        emb = md.apply(lambda x: pd.Series(x['genres']), axis=1).stack().reset_index(level=1, drop=True)
+        emb.name = 'genre'
+        print(emb.head(10))
+
+        gen_md = md.drop('genres', axis=1).join(emb)
+        print(gen_md.head(10))
+
+
+    def create_smd(self):
+        md = self.md
+        smd = self.smd
+        links_small = self.links_small
+
+        path = os.path.abspath('')
+        fname = '\data\links_small.csv'
+        links_small = pd.read_csv(path + fname, encoding='utf-8')
+        links_small = links_small[links_small['tmdbId'].notnull()]['tmdbId'].astype('int')
+        
+        md['id'] = md['id'].astype('int')
+        smd = md[md['id'].isin(links_small)]
+        smd.shape
+        smd = md[md['id'].isin(links_small)]
+        smd['tagline'] = smd['tagline'].fillna('')
+        smd['description'] = smd['overview'] + smd['tagline']
+        smd['description'] = smd['description'].fillna('')
+        self.links_small = links_small
+        self.smd = smd
+
+        return smd
+
+    def creat_tfidf_matrix(self):
+        smd = self.smd
+        indices = self.indices
+        cosine_sim = self.cosine_sim
+        titles = self.titles
+
+        tf_idf = TfidfVectorizer(analyzer='word', ngram_range=(1, 2), min_df=0, stop_words='english')
+        tfidf_matrix = tf_idf.fit_transform(smd['description'])
+        tfidf_matrix.shape
+        cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
+        cosine_sim[0]
+        print(cosine_sim[0])
+        smd = smd.reset_index()
+        titles = smd['title']
+        indices = pd.Series(smd.index, index=smd['title'])
+
+        self.indices = indices
+        self.cosine_sim = cosine_sim
+        self.titles = titles
+
+
+    def create_similarity_degree(self):
+        pass
+
+    def get_recommendations_with_tfidf(self):
+        pass
+
+    def get_recommendations_with_tfidf(self, title):
+        indices = self.indices
+        cosine_sim = self.cosine_sim
+        titles = self.titles
+
+        idx = indices[title]
+        sim_scores = list(enumerate(cosine_sim[idx]))
+        sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+        sim_scores = sim_scores[1:31]
+        movie_indices = [i[0] for i in sim_scores]
+        return titles.iloc[movie_indices]
+
+    def create_count_vectorizer_matrix(self):
+        smd = self.smd
+        indices = self.indices
+        cosine_sim = self.cosine_sim
+        titles = self.titles
+        md = self.md
+        links_small = self.links_small
+        keyword_frequency = self.keyword_frequency
+
+        path = os.path.abspath('')
+        fname = '\data\credits.csv'
+        credits = pd.read_csv(path + fname, encoding='utf-8')
+        fname = '\data\keywords.csv'
+        keywords = pd.read_csv(path + fname, encoding='utf-8')
+
+        credits['crew'][0]
+
+        keywords['id'] = keywords['id'].astype('int')
+        credits['id'] = credits['id'].astype('int')
+
+        md['id'] = md['id'].astype('int')
+
+        md.shape
+
+        md = md.merge(credits, on='id')
+        md = md.merge(keywords, on='id')
+
+        smd = md[md['id'].isin(links_small)]
+        smd.shape
+
+        smd['cast'] = smd['cast'].apply(literal_eval)
+        smd['crew'] = smd['crew'].apply(literal_eval)
+        smd['keywords'] = smd['keywords'].apply(literal_eval)
+        smd['cast_size'] = smd['cast'].apply(lambda x: len(x))
+        smd['crew_size'] = smd['crew'].apply(lambda x: len(x))
+
+        smd['director'] = smd['crew'].apply(self.get_director)
+
+        # 출연진 중 상위에 노출되는 3명만 추출
+        smd['cast'] = smd['cast'].apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else [])
+        smd['cast'] = smd['cast'].apply(lambda x: x[:3] if len(x) >= 3 else x)
+
+        # 출연진의 이름에서 공백 삭제
+        smd['keywords'] = smd['keywords'].apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else [])
+
+        # 감독의 이름에서 공백 삭제 및 3번 언급
+        smd['director'] = smd['director'].astype('str').apply(lambda x: str.lower(x.replace(" ", "")))
+        smd['director'] = smd['director'].apply(lambda x: [x, x, x])
+
+        # 키워드 빈도수
+        keyword_frequency = smd.apply(lambda x: pd.Series(x['keywords']), axis=1).stack().reset_index(level=1, drop=True)
+        keyword_frequency.name = 'keyword'
+
+        keyword_frequency = keyword_frequency.value_counts()
+        keyword_frequency[:5]
+
+        # 2번 이상 등장한 키워드만 추출
+        keyword_frequency = keyword_frequency[keyword_frequency > 1]
+
+        # 어근 추출을 통해 동일 의미&다른 형태의 단어(dogs&dog, imaging&image 등)를 동일한 단어로 인식
+        stemmer = SnowballStemmer('english')
+
+        self.keyword_frequency = keyword_frequency
+
+        # 키워드의 어근을 찾아서 공백 제거 후 세팅
+        smd['keywords'] = smd['keywords'].apply(self.filter_keywords)
+        smd['keywords'] = smd['keywords'].apply(lambda x: [stemmer.stem(i) for i in x])
+        smd['keywords'] = smd['keywords'].apply(lambda x: [str.lower(i.replace(" ", "")) for i in x])
+
+        smd['soup'] = smd['keywords'] + smd['cast'] + smd['director'] + smd['genres']
+        smd['soup'] = smd['soup'].apply(lambda x: ' '.join(x))
+
+        count = CountVectorizer(analyzer='word', ngram_range=(1,2), min_df=0, stop_words='english')
+        count_matrix = count.fit_transform(smd['soup'])
+
+        cosine_sim = cosine_similarity(count_matrix, count_matrix)
+        smd = smd.reset_index()
+        titles = smd['title']
+        indices = pd.Series(smd.index, index=smd['title'])
+
+        # a = self.get_recommendations_with_tfidf('The Godfather').head(10)
+        # b = self.get_recommendations_with_tfidf('Inception').head(10)
+        # print(a)
+        # print(b)
+
+        self.indices = indices
+        self.cosine_sim = cosine_sim
+        self.titles = titles        
+        self.smd = smd
+
+    def get_recommendations_with_count_vectorizer(self, title):
+        indices = self.indices
+        cosine_sim = self.cosine_sim
+        titles = self.titles
+
+        idx = indices[title]
+        sim_scores = list(enumerate(cosine_sim[idx]))
+        sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+        sim_scores = sim_scores[1:31]
+        movie_indices = [i[0] for i in sim_scores]
+        return titles.iloc[movie_indices]
+
+    @staticmethod
+    def get_director(x):
+        for i in x:
+            if i['job'] == 'Director':
+                return i['name']
         return np.nan
 
-# in 65
-path = os.path.abspath('')
-fname = '\data\links_small.csv'
-id_map = pd.read_csv(path + fname, encoding='utf-8')[['movieId', 'tmdbId']]
-id_map['tmdbId'] = id_map['tmdbId'].apply(convert_int)
-id_map.columns = ['movieId', 'id']
-id_map = id_map.merge(smd[['title', 'id']], on='id').set_index('title')
+    def filter_keywords(self, x):
+        keyword_frequency = self.keyword_frequency
+        words = []
+        for i in x:
+            if i in keyword_frequency:
+                words.append(i)
+        return words
 
-# in 66
-indices_map = id_map.set_index('id')
+    def craete_personal_value(self):
+        # surprise 라이브러리의 Reader
+        reader = Reader()
+        path = os.path.abspath('')
+        fname = '\data\\ratings_small.csv'
+        ratings = pd.read_csv(path + fname, encoding='utf-8')
+        data = Dataset.load_from_df(ratings[['userId', 'movieId','rating']], reader)
+        trainset = data.build_full_trainset()
+        testset = trainset.build_testset()
+        svd = SVD()
+        svd.fit(trainset)
+        predictions = svd.test(testset)
+        accuracy.rmse(predictions)
+        ratings[ratings['userId'] == 1]
+        svd.predict(1, 302, 3)
+        print(svd)
+        return(svd)
 
-# in 67
+    @staticmethod
+    def convert_int(x):
+        try:
+            return int(x)
+        except:
+            return np.nan
 
-def hybrid(userId, title):
-    print(svd)
-    idx = indices[title]
-    tmdbId = id_map.loc[title]['id']
-    movie_id = id_map.loc[title]['movieId']
+    def hybrid(self, userId, title):
+        indices = self.indices
+        cosine_sim = self.cosine_sim
+        
+        svd = self.craete_personal_value()
+        print(svd)
+        path = os.path.abspath('')
+        fname = '\data\links_small.csv'
+        id_map = pd.read_csv(path + fname, encoding='utf-8')[['movieId', 'tmdbId']]
+        id_map['tmdbId'] = id_map['tmdbId'].apply(self.convert_int)
+        id_map.columns = ['movieId', 'id']
+        id_map = id_map.merge(smd[['title', 'id']], on='id').set_index('title')
+        indices_map = id_map.set_index('id')
+
+        idx = indices[title]
+        tmdbId = id_map.loc[title]['id']
+        movie_id = id_map.loc[title]['movieId']
+        
+        sim_scores = list(enumerate(cosine_sim[int(idx)]))
+        sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+        sim_scores = sim_scores[1:26]
+        movie_indices = [i[0] for i in sim_scores]
+        
+        movies = smd.iloc[movie_indices][['title','vote_count','vote_average','year','id']]
+        movies['est'] = movies['id'].apply(lambda x: svd.predict(userId, indices_map.loc[x]['movieId']).est)
+        print(movies['est'])
+        movies = movies.sort_values('est', ascending=False)
+        return movies.head(10)
+
+
+if __name__ == "__main__":
+    ai = MovieAi()
+    print('***** START *****')
+
+    md = ai.preprocess()
+    print(f'메타 데이터 전처리 완료 : {md.head()}')
+
+    qualified = ai.create_qualified()
+    print(f'별점 상위 5% 데이터 : {qualified.head()}')
+
+    x = qualified
+    qualified['wr'] = qualified.apply(ai.weighted_rating, axis=1)
+    qualified = qualified.sort_values('wr', ascending=False).head(250)
+    print(f' Vote 상위 5% 값 : {qualified.head(15)}')
+
+    emb_proc = ai.emb_proc()
+    print(f' 장르 EMBEDING : {emb_proc}')
+
+    smd = ai.create_smd()
+    # description = overview + tagline
+    print(f' SMALL 메타 데이터 (약1만개) : {qualified.head()}')
+
+    tfidf_matrix = ai.creat_tfidf_matrix()
+    # TEST 줄거리(tfidf) 기반 추천
+    print(ai.get_recommendations_with_tfidf('The Godfather').head(10)) # 대부1
+    '''
+    973      The Godfather: Part II
+    8387                 The Family
+    3509                       Made
+    4196         Johnny Dangerously
+    29               Shanghai Triad
+    5667                       Fury
+    2412             American Movie
     
-    sim_scores = list(enumerate(cosine_sim[int(idx)]))
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = sim_scores[1:26]
-    movie_indices = [i[0] for i in sim_scores]
-    
-    movies = smd.iloc[movie_indices][['title','vote_count','vote_average','year','id']]
-    movies['est'] = movies['id'].apply(lambda x: svd.predict(userId, indices_map.loc[x]['movieId']).est)
-    print(movies['est'])
-    movies = movies.sort_values('est', ascending=False)
-    return movies.head(10)
+    1582    The Godfather: Part III
+    4221                    8 Women
+    2159              Summer of Sam
+    '''
+    print(ai.get_recommendations_with_tfidf('Inception').head(10)) # 인셉션
+    '''
+    5239                              Cypher
+    141                                Crumb
+    6398                         Renaissance
+    653                            Lone Star
+    1703                               House
+    4739                    The Pink Panther
+    319                                 Cobb
+    2828    What Ever Happened to Baby Jane?
+    8867                     Pitch Perfect 2
+    979          Once Upon a Time in America
+    '''
+    # TEST 줄거리(tfidf) 기반 추천
 
-# in 68
-# hybrid(1, 'Avatar')
-print(hybrid(1, 'Avatar'))
-
-# in 69
-# hybrid(500, 'Avatar')
-print(hybrid(500, 'Avatar'))
-
-# if __name__ == "__main__":
-#     ai = MovieAi()
-#     md = ai.create_metadata()
-#     print(f' [ 메타데이터 상위 5개 Row ] {md.head()}')
-#     print(f' [ 메타데이터 장르 전처리 전 ] {md.genres.head()}')
-#     md = ai.preprocess()
-#     print(f' [ 메타데이터 장르 전처리 후 ] {md.genres.head()}')
-#     print(f' [ 메타데이터 Year 전처리 후 ] {md.year.head()}')
-#     vote_counts, vote_averages, vote_mean = ai.calculate_mean()
-#     print(f' [ Vote 평균값 ] {vote_mean}')
-
-#     sort_values = vote_counts.quantile(0.95)
-#     print(f' [  Vote 상위 5 % ] {sort_values}')
-#     # quantile는 데이터를 크기대로 정렬하였을 때 분위수를 구하는 함수. 
-#     # quantile(0.95)는 상위 5%에 해당하는 값을 찾는 것
-#     qualified  = ai.create_qualified (md)
-#     print(f' [  별점 상위 5 % 로 구성된 DF (Qualified) Shape ] {qualified.shape}')
-#     print(f' [  별점 상위 5 % 로 구성된 DF (Qualified) 상위 15개 ] {qualified.head(15)}')
-#     print('------------------------ In 11 Finished -------------------------------')
-#     print('------------------------ Embeding Process -------------------------------')
-#     # stack() : stack이 (위에서 아래로 길게, 높게) 쌓는 것이면,
-#     # unstack은 쌓은 것을 옆으로 늘어놓는것(왼쪽에서 오른쪽으로 넓게) 라고 연상이 될 것
-#     # reset_index() : 기존의 행 인덱스를 제거하고 인덱스를 데이터 열로 추가
-#     print('참조 블로그: https://www.kaggle.com/alsojmc/movie-recommender-systems')
-#     md = ai.emb_proc(md)
-#     print(f' [  Embeding 이후 메타데이터 ] {md.head(10)}')
-#     # Line101: def build_chart(genre, percentile=0.85): 리턴 이유 ?
-
-#     '''
-#     전체 모집단(md)의 수가 45000개라서 샘플 1만개(smd) 추출: in 20
-#     '''
-#     smd = ai.create_smd(md)
+    cv_matrix = ai.create_count_vectorizer_matrix()
+    # TEST 감독(가중치*3), 배우(가중치*1), 키워드(가중치*1) (CountVectorizer)기반 추천
+    print(ai.get_recommendations_with_count_vectorizer('The Godfather').head(10)) # 대부1
+    '''
+    994            The Godfather: Part II
+    3300                 Gardens of Stone
+    3616    Tucker: The Man and His Dream
+    1346                    The Rainmaker
+    1602          The Godfather: Part III
+    3705                  The Cotton Club
+    4518               One from the Heart
+    981                    Apocalypse Now
+    2998                 The Conversation
+    5867                      Rumble Fish
+    '''
+    print(ai.get_recommendations_with_count_vectorizer('Inception').head(10)) # 인셉션
+    '''
+    6623                             The Prestige
+    3381                                  Memento
+    4145                                 Insomnia
+    2085                                Following
+    8031                    The Dark Knight Rises
+    8613                             Interstellar
+    6981                          The Dark Knight
+    6218                            Batman Begins
+    8207                                   Looper
+    5638    Sky Captain and the World of Tomorrow
+    '''
+    # TEST 감독(가중치*3), 배우(가중치*1), 키워드(가중치*1) (CountVectorizer)기반 추천
+    print('구분구분구분')
 
 
-#     print('------------------------ Tensor Modeling -------------------------------')
+    print(ai.hybrid(1, 'Avatar'))
+    print(ai.hybrid(500, 'Avatar'))
 
-#     ''' 줄거리 기반 추천 모델 : Title 에 Movie Index 추가 ''' 
+    print('***** END *****')
 
-#     # n-그램:단어장 생성에 사용할 토큰의 크기를 결정한다. 
-#     # 모노그램(1-그램)은 토큰 하나만 단어로 사용하며 바이그램(2-그램)은 
-#     # 두 개의 연결된 토큰을 하나의 단어로 사용한다.
-#     # Stop Words:문서에서 단어장을 생성할 때 무시할 수 있는 단어를 말한다. 
-#     # 보통 영어의 관사나 접속사, 한국어의 조사 등이 여기에 해당한다. 
-#     # stop_words 인수로 조절할 수 있다.
-#     '''
-#     TF(단어 빈도, term frequency)는 특정한 단어가 문서 내에 얼마나 자주 등장하는지를 나타내는 값
-#     이 값이 높을수록 문서에서 중요
-#     DF(문서 빈도, document frequency) 단어 자체가 문서군 내에서 자주 사용 되는 경우, 
-#     이것은 그 단어가 흔하게 등장한다는 것을 의미한다. 
-#     역문서 빈도, inverse document frequency): 
-#     '''
-#     tfidf_matrix = ai.creat_tfidf_matrix()
-#     print(f'[  TF-IDF ] {tfidf_matrix[10]}')
-
-#     similarity_degree = ai.create_similarity_degree()
-
-    
-#     title = ''
-#     recommendation_list = ai.get_recommendations_with_tfidf(title)
-#     the_list = ai.get_recommendations("The Godfather").head(10)
-#     print(f'[ 타이틀이 The Godfather 일때 추천리스트  ] {the_list}')
-
-#     ''' 감독(가중치 3), 배우(가중치 1), 키워드(가중치 1) 기반 추천 모델 :  ''' 
-
-#     recommendation_list = ai.get_recommendations_with_count_vectorizer(title)
-#     the_list = ai.get_recommendations("The Dark Knight").head(10)
-#     print(f'[ 타이틀이 The Dark Knight 일때 추천리스트  ] {the_list}')
-
-
-#     ''' 인기도, 평점 추가한 개선된 추천 모델 :  ''' 
-
-#     recommendation_list = ai.get_advanced_recommendations(title)
-#     the_list = ai.get_recommendations("The Dark Knight").head(10)
-#     print(f'[ 타이틀이 The Dark Knight 일때 개선된 추천리스트  ] {the_list}')
-
-
-#     # surprise 라이브러리의 Reader
-
-#     '''개인화된 평점 분석'''
-#     '''
-#     특이값 분해 (SVD, Singular Value Decomposition)
-#     전체 추천모델에서 개인에 최적화된 특이값을 적용하는 모델
-#     행렬곱을 통해 추출
-#     svd = SVD() 를 사용하겠다.
-#     '''
-#     personal_value = ai.craete_personal_value()
-
-#     print(f'[ SVD 알고리즘이 적용된 추천 결과 ] {personal_value}')
-#     '''
-#     Prediction(uid=1, iid=302, r_ui=3, est=2.8177969531709084, details={'was_impossible': False})
-#     print(svd.predict(1, 302, 3))
-#     '''
-
-#     '''하이브리드 추천 모델 : 사용자ID 와 영화 Title 을 입력하면 
-#         유사도가 높은 다른 영화를 추천해 주는 모델
-#     '''
-#     hybrid_result = ai.hybrid(id, title)
-#     print(f'[ 사용자ID 와 영화 Title을 통한 영화추천 마지막 결과 ] :::::::::::: {hybrid_result}')
