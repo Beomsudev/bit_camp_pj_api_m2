@@ -13,6 +13,9 @@ from surprise import Reader, Dataset, SVD, accuracy
 
 import warnings; warnings.simplefilter('ignore')
 
+class MovieAi(object):
+    def __init__(self):
+        ...
 
 # path = os.path.abspath("")
 # fname = '\data\movie_lens\movies_metadata.csv'
@@ -71,30 +74,35 @@ qualified['vote_average'] = qualified['vote_average'].astype('int')
 
 # in 8
 def weighted_rating(x):
+    # print(x)
+    # print(m)
+    # print(C)
     v = x['vote_count']
     R = x['vote_average']
+    # print(v)
+    # print(R)
     return (v/(v+m) * R) + (m/(m+v) * C)
 
 # in 9
 x = qualified
 qualified['wr'] = qualified.apply(weighted_rating, axis=1)
-
+print(qualified['wr'])
 # in 10
 # Weighted Rating 상위 250개의 영화 
 qualified = qualified.sort_values('wr', ascending=False).head(250)
 
-# in 11
-# print(qualified.head(15))
+# # in 11
+print(qualified.head(15))
 
 # in 12
 # stack() : stack이 (위에서 아래로 길게, 높게) 쌓는 것이면, unstack은 쌓은 것을 옆으로 늘어놓는것(왼쪽에서 오른쪽으로 넓게) 라고 연상이 될 것
 # reset_index() : 기존의 행 인덱스를 제거하고 인덱스를 데이터 열로 추가
 s = md.apply(lambda x: pd.Series(x['genres']), axis=1).stack().reset_index(level=1, drop=True)
 s.name = 'genre'
-# print(s.head(10))
+print(s.head(10))
 
 gen_md = md.drop('genres', axis=1).join(s)
-# print(gen_md.head(10))
+print(gen_md.head(10))
 
 # in 13
 
@@ -151,7 +159,7 @@ smd['description'] = smd['overview'] + smd['tagline']
 smd['description'] = smd['description'].fillna('')
 
 smd['description'].head()
-# print(smd['description'].head())
+print(smd['description'].head())
 
 # in 21
 # n-그램:단어장 생성에 사용할 토큰의 크기를 결정한다. 모노그램(1-그램)은 토큰 하나만 단어로 사용하며 바이그램(2-그램)은 두 개의 연결된 토큰을 하나의 단어로 사용한다.
@@ -172,16 +180,16 @@ cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
 
 # in 25
 cosine_sim[0]
-# print(cosine_sim[0])
+print(cosine_sim[0])
 
 # in 26
 smd = smd.reset_index()
 titles = smd['title']
 indices = pd.Series(smd.index, index=smd['title'])
 
-# print(titles.head(), indices.head())
+print(titles.head(), indices.head())
 
-# in 27
+# # in 27
 
 def get_recommendations(title):
     idx = indices[title]
@@ -192,12 +200,12 @@ def get_recommendations(title):
     return titles.iloc[movie_indices]
 
 # in 28
-# get_recommendations('The Godfather').head(10)
-# print(get_recommendations('The Godfather').head(10))
+get_recommendations('The Godfather').head(10)
+print(get_recommendations('The Godfather').head(10))
 
-# in 29
-# get_recommendations('Inception').head(10)
-# print(get_recommendations('Inception').head(10))
+# # in 29
+get_recommendations('Inception').head(10)
+print(get_recommendations('Inception').head(10))
 
 # in 30
 path = os.path.abspath('')
@@ -210,6 +218,7 @@ keywords = pd.read_csv(path + fname, encoding='utf-8')
 credits['crew'][0]
 # print(credits['crew'][0])
 
+print(md)
 # in 32
 keywords['id'] = keywords['id'].astype('int')
 credits['id'] = credits['id'].astype('int')
@@ -226,16 +235,16 @@ md = md.merge(keywords, on='id')
 # in 35
 smd = md[md['id'].isin(links_small)]
 smd.shape
-# print(smd.shape)
+print(smd.shape)
 
-# in 36
+# # in 36
 smd['cast'] = smd['cast'].apply(literal_eval)
 smd['crew'] = smd['crew'].apply(literal_eval)
 smd['keywords'] = smd['keywords'].apply(literal_eval)
 smd['cast_size'] = smd['cast'].apply(lambda x: len(x))
 smd['crew_size'] = smd['crew'].apply(lambda x: len(x))
 
-# in 37
+# # in 37
 
 def get_director(x):
     for i in x:
@@ -267,10 +276,10 @@ smd['director'] = smd['director'].apply(lambda x: [x, x, x])
 s = smd.apply(lambda x: pd.Series(x['keywords']), axis=1).stack().reset_index(level=1, drop=True)
 s.name = 'keyword'
 
-# in 44
+# # in 44
 s = s.value_counts()
 s[:5]
-# print(s[:5])
+print(s[:5])
 
 # in 45
 # 2번 이상 등장한 키워드만 추출
@@ -297,33 +306,36 @@ smd['keywords'] = smd['keywords'].apply(filter_keywords)
 smd['keywords'] = smd['keywords'].apply(lambda x: [stemmer.stem(i) for i in x])
 smd['keywords'] = smd['keywords'].apply(lambda x: [str.lower(i.replace(" ", "")) for i in x])
 
-# in 49
+# # in 49
 smd['soup'] = smd['keywords'] + smd['cast'] + smd['director'] + smd['genres']
 smd['soup'] = smd['soup'].apply(lambda x: ' '.join(x))
 
-# in 50
+# # in 50
 count = CountVectorizer(analyzer='word', ngram_range=(1,2), min_df=0, stop_words='english')
 count_matrix = count.fit_transform(smd['soup'])
 
-# in 51
+# # in 51
 cosine_sim = cosine_similarity(count_matrix, count_matrix)
 
-# in 52
+# # in 52
 smd = smd.reset_index()
 titles = smd['title']
 indices = pd.Series(smd.index, index=smd['title'])
 
 # in 53
-# get_recommendations('The Dark Knight').head(10)
-# print(get_recommendations('The Dark Knight').head(10))
+get_recommendations('The Dark Knight').head(10)
+print(get_recommendations('The Godfather').head(10))
 
 # in 54
-# get_recommendations('Mean Girls').head(10)
-# print(get_recommendations('Mean Girls').head(10))
+get_recommendations('Mean Girls').head(10)
+print(get_recommendations('Inception').head(10))
 
-# in 55
+# # in 55
 
 def improved_recommendations(title):
+    print('**********')
+    print(indices)
+    print(cosine_sim)
     print(title)
     idx = indices[title]
     print(idx)
@@ -345,16 +357,18 @@ def improved_recommendations(title):
     qualified['vote_count'] = qualified['vote_count'].astype('int')
     qualified['wr'] = qualified.apply(weighted_rating, axis=1)
     qualified = qualified.sort_values('wr', ascending=False).head(10)
-    # print(qualified)
+    print('##########')
+    print(qualified)
     return qualified
 
+print('구분구분구분')
 # in 56
 # improved_recommendations('The Dark Knight')
-# print(improved_recommendations('The Dark Knight'))
+print(improved_recommendations('The Godfather'))
 
 # in 57
 # improved_recommendations('Mean Girls')
-# print(improved_recommendations('Mean Girls'))
+print(improved_recommendations('Inception'))
 
 # in 58
 # surprise 라이브러리의 Reader
@@ -411,6 +425,7 @@ indices_map = id_map.set_index('id')
 # in 67
 
 def hybrid(userId, title):
+    print(svd)
     idx = indices[title]
     tmdbId = id_map.loc[title]['id']
     movie_id = id_map.loc[title]['movieId']
@@ -422,13 +437,113 @@ def hybrid(userId, title):
     
     movies = smd.iloc[movie_indices][['title','vote_count','vote_average','year','id']]
     movies['est'] = movies['id'].apply(lambda x: svd.predict(userId, indices_map.loc[x]['movieId']).est)
+    print(movies['est'])
     movies = movies.sort_values('est', ascending=False)
     return movies.head(10)
 
 # in 68
 # hybrid(1, 'Avatar')
-# print(hybrid(1, 'Avatar'))
+print(hybrid(1, 'Avatar'))
 
 # in 69
 # hybrid(500, 'Avatar')
 print(hybrid(500, 'Avatar'))
+
+# if __name__ == "__main__":
+#     ai = MovieAi()
+#     md = ai.create_metadata()
+#     print(f' [ 메타데이터 상위 5개 Row ] {md.head()}')
+#     print(f' [ 메타데이터 장르 전처리 전 ] {md.genres.head()}')
+#     md = ai.preprocess()
+#     print(f' [ 메타데이터 장르 전처리 후 ] {md.genres.head()}')
+#     print(f' [ 메타데이터 Year 전처리 후 ] {md.year.head()}')
+#     vote_counts, vote_averages, vote_mean = ai.calculate_mean()
+#     print(f' [ Vote 평균값 ] {vote_mean}')
+
+#     sort_values = vote_counts.quantile(0.95)
+#     print(f' [  Vote 상위 5 % ] {sort_values}')
+#     # quantile는 데이터를 크기대로 정렬하였을 때 분위수를 구하는 함수. 
+#     # quantile(0.95)는 상위 5%에 해당하는 값을 찾는 것
+#     qualified  = ai.create_qualified (md)
+#     print(f' [  별점 상위 5 % 로 구성된 DF (Qualified) Shape ] {qualified.shape}')
+#     print(f' [  별점 상위 5 % 로 구성된 DF (Qualified) 상위 15개 ] {qualified.head(15)}')
+#     print('------------------------ In 11 Finished -------------------------------')
+#     print('------------------------ Embeding Process -------------------------------')
+#     # stack() : stack이 (위에서 아래로 길게, 높게) 쌓는 것이면,
+#     # unstack은 쌓은 것을 옆으로 늘어놓는것(왼쪽에서 오른쪽으로 넓게) 라고 연상이 될 것
+#     # reset_index() : 기존의 행 인덱스를 제거하고 인덱스를 데이터 열로 추가
+#     print('참조 블로그: https://www.kaggle.com/alsojmc/movie-recommender-systems')
+#     md = ai.emb_proc(md)
+#     print(f' [  Embeding 이후 메타데이터 ] {md.head(10)}')
+#     # Line101: def build_chart(genre, percentile=0.85): 리턴 이유 ?
+
+#     '''
+#     전체 모집단(md)의 수가 45000개라서 샘플 1만개(smd) 추출: in 20
+#     '''
+#     smd = ai.create_smd(md)
+
+
+#     print('------------------------ Tensor Modeling -------------------------------')
+
+#     ''' 줄거리 기반 추천 모델 : Title 에 Movie Index 추가 ''' 
+
+#     # n-그램:단어장 생성에 사용할 토큰의 크기를 결정한다. 
+#     # 모노그램(1-그램)은 토큰 하나만 단어로 사용하며 바이그램(2-그램)은 
+#     # 두 개의 연결된 토큰을 하나의 단어로 사용한다.
+#     # Stop Words:문서에서 단어장을 생성할 때 무시할 수 있는 단어를 말한다. 
+#     # 보통 영어의 관사나 접속사, 한국어의 조사 등이 여기에 해당한다. 
+#     # stop_words 인수로 조절할 수 있다.
+#     '''
+#     TF(단어 빈도, term frequency)는 특정한 단어가 문서 내에 얼마나 자주 등장하는지를 나타내는 값
+#     이 값이 높을수록 문서에서 중요
+#     DF(문서 빈도, document frequency) 단어 자체가 문서군 내에서 자주 사용 되는 경우, 
+#     이것은 그 단어가 흔하게 등장한다는 것을 의미한다. 
+#     역문서 빈도, inverse document frequency): 
+#     '''
+#     tfidf_matrix = ai.creat_tfidf_matrix()
+#     print(f'[  TF-IDF ] {tfidf_matrix[10]}')
+
+#     similarity_degree = ai.create_similarity_degree()
+
+    
+#     title = ''
+#     recommendation_list = ai.get_recommendations_with_tfidf(title)
+#     the_list = ai.get_recommendations("The Godfather").head(10)
+#     print(f'[ 타이틀이 The Godfather 일때 추천리스트  ] {the_list}')
+
+#     ''' 감독(가중치 3), 배우(가중치 1), 키워드(가중치 1) 기반 추천 모델 :  ''' 
+
+#     recommendation_list = ai.get_recommendations_with_count_vectorizer(title)
+#     the_list = ai.get_recommendations("The Dark Knight").head(10)
+#     print(f'[ 타이틀이 The Dark Knight 일때 추천리스트  ] {the_list}')
+
+
+#     ''' 인기도, 평점 추가한 개선된 추천 모델 :  ''' 
+
+#     recommendation_list = ai.get_advanced_recommendations(title)
+#     the_list = ai.get_recommendations("The Dark Knight").head(10)
+#     print(f'[ 타이틀이 The Dark Knight 일때 개선된 추천리스트  ] {the_list}')
+
+
+#     # surprise 라이브러리의 Reader
+
+#     '''개인화된 평점 분석'''
+#     '''
+#     특이값 분해 (SVD, Singular Value Decomposition)
+#     전체 추천모델에서 개인에 최적화된 특이값을 적용하는 모델
+#     행렬곱을 통해 추출
+#     svd = SVD() 를 사용하겠다.
+#     '''
+#     personal_value = ai.craete_personal_value()
+
+#     print(f'[ SVD 알고리즘이 적용된 추천 결과 ] {personal_value}')
+#     '''
+#     Prediction(uid=1, iid=302, r_ui=3, est=2.8177969531709084, details={'was_impossible': False})
+#     print(svd.predict(1, 302, 3))
+#     '''
+
+#     '''하이브리드 추천 모델 : 사용자ID 와 영화 Title 을 입력하면 
+#         유사도가 높은 다른 영화를 추천해 주는 모델
+#     '''
+#     hybrid_result = ai.hybrid(id, title)
+#     print(f'[ 사용자ID 와 영화 Title을 통한 영화추천 마지막 결과 ] :::::::::::: {hybrid_result}')
