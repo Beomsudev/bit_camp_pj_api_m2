@@ -10,12 +10,9 @@ from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.corpus import wordnet
 from surprise import Reader, Dataset, SVD, accuracy
 
-from com_dayoung_api.cmm.util.file_helper import FileReader, FileChecker
 
 class MovieAi:
     def __init__(self):
-        self.fileReader = FileReader()
-        self.filechecker = FileChecker()
         self.path = os.path.abspath("")
 
         self.md = object
@@ -23,11 +20,11 @@ class MovieAi:
         self.min_vote = int
         self.movie_ave = int
         self.smd = object
-        self.indices = object
-        self.cosine_sim = object
-        self.titles = object
-        self.links_small = object
-        self.keyword_frequency = object
+        self.indices = float
+        self.cosine_sim = float
+        self.titles = str
+        self.links_small = int
+        self.keyword_frequency = float
 
     # def hook(self):
 
@@ -66,7 +63,6 @@ class MovieAi:
         '''
         
         
-        fchecker = self.filechecker
 
         path = os.path.abspath('')
         fname = '\data\movies_metadata.csv'
@@ -116,7 +112,6 @@ class MovieAi:
         vote_count                : null count =      6
         year                      : null count =      0
         '''
-        fchecker = self.filechecker
         md = self.md
         min_vote = self.min_vote
 
@@ -127,7 +122,6 @@ class MovieAi:
 
 
         print(qualified)
-        fchecker.df_null_check(qualified)
 
         '''
         ['title', 'year', 'vote_count', 'vote_average', 'popularity', 'genres']
@@ -336,8 +330,9 @@ class MovieAi:
             if i in keyword_frequency:
                 words.append(i)
         return words
-
-    def craete_personal_value(self):
+    
+    @staticmethod
+    def craete_personal_value():
         # surprise 라이브러리의 Reader
         reader = Reader()
         path = os.path.abspath('')
@@ -352,7 +347,6 @@ class MovieAi:
         accuracy.rmse(predictions)
         ratings[ratings['userId'] == 1]
         svd.predict(1, 302, 3)
-        print(svd)
         return(svd)
 
     @staticmethod
@@ -367,7 +361,6 @@ class MovieAi:
         cosine_sim = self.cosine_sim
         
         svd = self.craete_personal_value()
-        print(svd)
         path = os.path.abspath('')
         fname = '\data\links_small.csv'
         id_map = pd.read_csv(path + fname, encoding='utf-8')[['movieId', 'tmdbId']]
@@ -387,7 +380,6 @@ class MovieAi:
         
         movies = smd.iloc[movie_indices][['title','vote_count','vote_average','year','id']]
         movies['est'] = movies['id'].apply(lambda x: svd.predict(userId, indices_map.loc[x]['movieId']).est)
-        print(movies['est'])
         movies = movies.sort_values('est', ascending=False)
         return movies.head(10)
 
@@ -477,8 +469,20 @@ if __name__ == "__main__":
     print('구분구분구분')
 
 
+    print(ai.hybrid(1, 'The Godfather'))
+    print(ai.hybrid(500, 'The Godfather'))
+
+    print(ai.hybrid(1, 'Inception'))
+    print(ai.hybrid(500, 'Inception'))
+
+    print(ai.hybrid(1, 'Inception'))
+    print(ai.hybrid(500, 'Inception'))
+
     print(ai.hybrid(1, 'Avatar'))
     print(ai.hybrid(500, 'Avatar'))
+
+    print(ai.hybrid(1, 'Iron Man 2'))
+    print(ai.hybrid(500, 'Iron Man 2'))
 
     print('***** END *****')
 

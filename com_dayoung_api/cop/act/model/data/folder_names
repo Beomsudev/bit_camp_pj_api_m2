@@ -1,0 +1,7 @@
+d = max depth
+d# = max depth number
+ex) d3 => max depth = 3
+
+s = random state
+s# = random state number
+ex) s0 => random state = 0
