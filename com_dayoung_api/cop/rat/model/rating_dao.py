@@ -48,8 +48,8 @@ class RatingDao(RatingDto):
         print('##### new rating data registering #####')
         print(rating)
         newRating = RatingDao(rat_id = rating['rat_id'],
-                            userid = rating['userid'],
-                            movieid = rating['movieid'],
+                            usr_id = rating['usr_id'],
+                            mov_id = rating['mov_id'],
                             rating = rating['rating'])
         session.add(newRating)
         session.commit()
@@ -73,6 +73,6 @@ class RatingDao(RatingDto):
         print('##### rating data delete #####')
         data = cls.query.get(rat_id)
         db.session.delete(data)
-        session.commit()
-        session.close()
+        db.session.commit()
+        db.session.close()
         print('##### rating data delete complete #####')

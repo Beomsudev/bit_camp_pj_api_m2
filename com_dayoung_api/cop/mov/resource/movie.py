@@ -9,7 +9,7 @@ class Movie(Resource):
     @staticmethod
     def post():
         parser = reqparse.RequestParser()
-        parser.add_argument('movieid', type=int, required=False, help='This field should be a movieid')
+        parser.add_argument('mov_id', type=int, required=False, help='This field should be a movieid')
         parser.add_argument('title_kor', type=str, required=True, help='This field should be a title_kor')
         parser.add_argument('title_naver_eng', type=str, required=True, help='This field should be a title_naver_eng')
         parser.add_argument('genres_kor', type=str, required=True, help='This field should be a genres_kor')
@@ -48,7 +48,7 @@ class Movie(Resource):
     @staticmethod
     def put():
         parser = reqparse.RequestParser()
-        parser.add_argument('movieid', type=int, required=True, help='This field should be a movieid')
+        parser.add_argument('mov_id', type=int, required=True, help='This field should be a movieid')
         parser.add_argument('title_kor', type=str, required=True, help='This field should be a title_kor')
         parser.add_argument('title_naver_eng', type=str, required=True, help='This field should be a title_naver_eng')
         parser.add_argument('genres_kor', type=str, required=True, help='This field should be a genres_kor')
@@ -64,7 +64,7 @@ class Movie(Resource):
         parser.add_argument('image_naver', type=str, required=True, help='This field should be a image_naver')         
         args = parser.parse_args()
         print(args)
-        movies = MovieDto(args['movieid'], \
+        movies = MovieDto(args['mov_id'], \
                         args['title_kor'], \
                         args['title_naver_eng'], \
                         args['genres_kor'], \
@@ -98,21 +98,3 @@ class Movies(Resource):
         print(data[0])
         return data, 200        
 
-class MovieDel(Resource):
-
-    @staticmethod
-    def post():
-        parser = reqparse.RequestParser()
-        parser.add_argument('movieid', type=str, required=True, help='This field should be a movieid')     
-        args = parser.parse_args()
-        print('*********')
-        print(f'{args}')
-        print('*********')
-        movieid = args['movieid']
-        print(movieid)
-
-        try:
-            MovieDao.delete_movie(movieid)
-            return{'code':0, 'message':'SUCCESS'}, 200
-        except:
-            return {'message':'An error occured registering the movie'}, 500

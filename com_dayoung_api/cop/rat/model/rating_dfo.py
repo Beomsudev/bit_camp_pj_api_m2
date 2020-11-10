@@ -55,7 +55,7 @@ class RatingDfo:
         userid : 70 번 까지 (10000 row)
         (원본 데이터 : 10만 건)
         '''
-        reduction_df = drop_df[(drop_df['userId'] < 71)]
+        reduction_df = drop_df[(drop_df['userId'] < 3)]
         ##### 데이터 축소 #####
 
         ##### ratingid column 추가 #####
@@ -71,9 +71,9 @@ class RatingDfo:
         column_sort_df = reduction_df[['ratingid', 'userId', 'movieId', 'rating']]
 
         mycolumns = {
-            'ratingid':'ratingid',
-            'userId':'userid',
-            'movieId':'movieid',
+            'ratingid':'rat_id',
+            'userId':'usr_id',
+            'movieId':'mov_id',
             'rating':'rating'
         }
 

@@ -49,7 +49,7 @@ class MovieDao(MovieDto):
     
     @classmethod
     def find_by_id(cls, mov_id):
-        print('##### find title #####')
+        print('##### find id #####')
         return session.query(MovieDto).filter(MovieDto.mov_id.like(f'{mov_id}')).one()
 
     @classmethod

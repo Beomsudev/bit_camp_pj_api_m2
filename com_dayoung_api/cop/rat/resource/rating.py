@@ -7,14 +7,14 @@ class Rating(Resource):
     @staticmethod
     def post():
         parser = reqparse.RequestParser()
-        parser.add_argument('ratingid', type=int, required=False, help='This field should be a ratingid')
-        parser.add_argument('userid', type=int, required=True, help='This field should be a userid')
-        parser.add_argument('movieid', type=int, required=True, help='This field should be a movieid')
+        parser.add_argument('rat_id', type=int, required=False, help='This field should be a ratingid')
+        parser.add_argument('usr_id', type=int, required=True, help='This field should be a userid')
+        parser.add_argument('mov_id', type=int, required=True, help='This field should be a movieid')
         parser.add_argument('rating', type=float, required=True, help='This field should be a rating')    
         args = parser.parse_args()
-        ratings = RatingDto(args['ratingid'], \
-                        args['userid'], \
-                        args['movieid'], \
+        ratings = RatingDto(args['rat_id'], \
+                        args['usr_id'], \
+                        args['mov_id'], \
                         args['rating'])
         print('*********')
         print(args)
@@ -38,14 +38,14 @@ class Rating(Resource):
     @staticmethod
     def put():
         parser = reqparse.RequestParser()
-        parser.add_argument('ratingid', type=int, required=True, help='This field should be a ratingid')
-        parser.add_argument('userid', type=int, required=False, help='This field should be a userid')
-        parser.add_argument('movieid', type=int, required=False, help='This field should be a movieid')
+        parser.add_argument('rat_id', type=int, required=True, help='This field should be a ratingid')
+        parser.add_argument('usr_id', type=int, required=False, help='This field should be a userid')
+        parser.add_argument('mov_id', type=int, required=False, help='This field should be a movieid')
         parser.add_argument('rating', type=float, required=True, help='This field should be a rating')    
         args = parser.parse_args()
-        ratings = RatingDto(args['ratingid'], \
-                        args['userid'], \
-                        args['movieid'], \
+        ratings = RatingDto(args['rat_id'], \
+                        args['usr_id'], \
+                        args['mov_id'], \
                         args['rating'])
         print('*********')
         print(args)
@@ -65,19 +65,3 @@ class Ratings(Resource):
         data = RatingDao.find_all()
         return data, 200
 
-class RatingDel(Resource):
-
-    @staticmethod
-    def post():
-        parser = reqparse.RequestParser()
-        parser.add_argument('ratingid', type=int, required=True, help='This field should be a ratingid')
-        args = parser.parse_args()
-        print('*********')
-        print(args)
-        ratingid = args['ratingid']
-
-        try:
-            RatingDao.delete_rating(ratingid)
-            return{'code':0, 'message':'SUCCESS'}, 200
-        except:
-            return {'message':'An error occured registering the movie'}, 500

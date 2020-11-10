@@ -670,6 +670,12 @@ class MovieDf:
         'link_naver', 
         'image_naver']]
         
+        mycolumns = {
+            'movieid':'mov_id'
+        }
+        sort_df = sort_df.rename(columns=mycolumns)
+
+
         final_merge_df = sort_df
         print('***** 무비렌즈 KMDB NAVER MERGE 및 가공 완료 *****')
         return final_merge_df
